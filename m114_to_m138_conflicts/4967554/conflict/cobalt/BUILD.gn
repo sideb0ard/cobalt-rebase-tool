@@ -1,0 +1,140 @@
+<<<<<<< HEAD:starboard/build/config/clang.gni
+<<<<<<< HEAD:chrobalt/BUILD.gn
+<<<<<<< HEAD:starboard/build/config/clang.gni
+<<<<<<< HEAD:chrobalt/BUILD.gn
+<<<<<<<< HEAD:third_party/mediapipe/src/.github/bot_config.yml
+# Copyright 2021 The MediaPipe Authors.
+========
+# Copyright 2024 The Cobalt Authors. All Rights Reserved.
+>>>>>>>> c4a0b5d0a8c (Build starboard shared library for linux-x64x11 (#4215)):chrobalt/BUILD.gn
+=======
+# Copyright 2023 The Cobalt Authors. All Rights Reserved.
+>>>>>>> d45fd1a3537 (Revert "Build starboard shared library for linux-x64x11 (#4215)" (#4245)):starboard/build/config/clang.gni
+=======
+# Copyright 2024 The Cobalt Authors. All Rights Reserved.
+>>>>>>> c4a0b5d0a8c (Build starboard shared library for linux-x64x11 (#4215)):chrobalt/BUILD.gn
+=======
+# Copyright 2023 The Cobalt Authors. All Rights Reserved.
+>>>>>>> d45fd1a3537 (Revert "Build starboard shared library for linux-x64x11 (#4215)" (#4245)):starboard/build/config/clang.gni
+=======
+# Copyright 2024 The Cobalt Authors. All Rights Reserved.
+>>>>>>> 9049b1718b7 (Revert "Revert "Build starboard shared library for linux-x64x11 (#4215)"" (#4247)):chrobalt/BUILD.gn
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+
+<<<<<<< HEAD:starboard/build/config/clang.gni
+<<<<<<< HEAD:chrobalt/BUILD.gn
+<<<<<<< HEAD:starboard/build/config/clang.gni
+<<<<<<< HEAD:chrobalt/BUILD.gn
+<<<<<<<< HEAD:third_party/mediapipe/src/.github/bot_config.yml
+# A list of assignees
+assignees:
+   - kuaashish
+   - kalyan2789g
+========
+=======
+>>>>>>> c4a0b5d0a8c (Build starboard shared library for linux-x64x11 (#4215)):chrobalt/BUILD.gn
+=======
+>>>>>>> 9049b1718b7 (Revert "Revert "Build starboard shared library for linux-x64x11 (#4215)"" (#4247)):chrobalt/BUILD.gn
+group("gn_all") {
+  testonly = true
+
+  # TODO(b/371589344): Fix android build configs.
+<<<<<<< HEAD
+<<<<<<< HEAD
+  if (target_os != "android") {
+    deps = [ "//starboard($starboard_toolchain)" ]
+  }
+<<<<<<< HEAD:starboard/build/config/clang.gni
+<<<<<<< HEAD:starboard/build/config/clang.gni
+=======
+=======
+>>>>>>> d45fd1a3537 (Revert "Build starboard shared library for linux-x64x11 (#4215)" (#4245)):starboard/build/config/clang.gni
+import("//starboard/build/toolchain/starboard_toolchains.gni")
+
+declare_args() {
+  clang_revision = "17-init-8029-g27f27d15-3"
+<<<<<<< HEAD:chrobalt/BUILD.gn
+=======
+=======
+  deps = [ "//starboard($starboard_toolchain)" ]
+<<<<<<< HEAD
+>>>>>>> 6287f24a72b (Add starboard build to android (#4259))
+=======
+=======
+  deps = [
+    "//starboard($starboard_toolchain)",
+    "//starboard/nplb",
+  ]
+>>>>>>> 4967554cd45 (Build nplb test (#4299))
+  if (!is_android) {
+    deps += [ ":cobalt" ]
+  } else {
+    # TODO(cobalt): reuse build rules below to define Android target.
+    deps += [ "android:cobalt_apk" ]
+  }
+}
+
+if (!is_android) {
+  executable("cobalt") {
+    testonly = true
+
+    sources = [
+      "cobalt.cc",
+      "cobalt_content_browser_client.cc",
+      "cobalt_content_browser_client.h",
+      "cobalt_main_delegate.cc",
+      "cobalt_main_delegate.h",
+    ]
+
+    defines = []
+
+    deps = [
+      "//content/public/app",
+      "//content/shell:content_shell_app",
+      "//content/shell:content_shell_lib",
+      "//content/shell:pak",
+      "//sandbox",
+    ]
+
+    data_deps = [
+      "//content/shell:pak",
+      "//tools/v8_context_snapshot:v8_context_snapshot",
+    ]
+
+    data_deps += [ "//components/crash/core/app:chrome_crashpad_handler" ]
+
+    configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
+  }
+>>>>>>> f1a3316cbf5 (Poor man's cobalt target (#4277))
+}
+
+default_clang_base_path = "$starboard_toolchains_path/x86_64-linux-gnu-clang-chromium-${clang_revision}"
+
+declare_args() {
+  clang_base_path = default_clang_base_path
+>>>>>>> d45fd1a3537 (Revert "Build starboard shared library for linux-x64x11 (#4215)" (#4245)):starboard/build/config/clang.gni
+=======
+>>>>>>> 9049b1718b7 (Revert "Revert "Build starboard shared library for linux-x64x11 (#4215)"" (#4247)):chrobalt/BUILD.gn
+}
+
+default_clang_base_path = "$starboard_toolchains_path/x86_64-linux-gnu-clang-chromium-${clang_revision}"
+
+declare_args() {
+  clang_base_path = default_clang_base_path
+>>>>>>> d45fd1a3537 (Revert "Build starboard shared library for linux-x64x11 (#4215)" (#4245)):starboard/build/config/clang.gni
+=======
+>>>>>>> c4a0b5d0a8c (Build starboard shared library for linux-x64x11 (#4215)):chrobalt/BUILD.gn
+}
+>>>>>>>> c4a0b5d0a8c (Build starboard shared library for linux-x64x11 (#4215)):chrobalt/BUILD.gn

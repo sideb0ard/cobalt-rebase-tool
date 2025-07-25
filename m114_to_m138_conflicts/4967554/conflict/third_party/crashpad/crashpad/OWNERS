@@ -1,0 +1,39 @@
+# Copyright 2025 The Crashpad Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+<<<<<<< HEAD:third_party/crashpad/crashpad/OWNERS
+<<<<<<< HEAD:third_party/crashpad/crashpad/OWNERS
+jperaza@chromium.org
+justincohen@chromium.org
+lgrey@chromium.org
+mark@chromium.org
+wfh@chromium.org
+=======
+config("platform_configuration") {
+  configs = [
+    "//starboard/build/config/sabi",
+    "//starboard/linux/x64x11/shared/platform_configuration",
+=======
+copy("nplb_file_tests_data") {
+  sources = [
+    "dir_with_files/file11",
+    "dir_with_files/file12",
+    "dir_with_only_subdir/dir_with_files/file21",
+    "dir_with_only_subdir/dir_with_files/file22",
+    "file01",
+    "file_with_long_name_and_contents_for_seek_testing_1234567890",
+>>>>>>> 4967554cd45 (Build nplb test (#4299)):starboard/nplb/testdata/file_tests/BUILD.gn
+  ]
+}
+>>>>>>> c4a0b5d0a8c (Build starboard shared library for linux-x64x11 (#4215)):starboard/linux/x64x11/platform_configuration/BUILD.gn

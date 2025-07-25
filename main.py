@@ -50,6 +50,7 @@ class RebaseLogger:
         self.resolved_by_yolo_count = 0
         self.resolved_manually_count = 0
         self.committed_as_conflict_count = 0
+        self.skipped_complex_conflict_count = 0
         self.subtree_fixup_count = 0
         self.total_commits = 0
 
@@ -72,6 +73,9 @@ class RebaseLogger:
     
     def log_committed_as_conflict(self):
         self.committed_as_conflict_count += 1
+    
+    def log_skipped_complex_conflict(self):
+        self.skipped_complex_conflict_count += 1
 
     def log_subtree_fixup(self):
         self.subtree_fixup_count += 1
@@ -89,6 +93,7 @@ class RebaseLogger:
         print(f"💥 Committed as Conflict:    {self.committed_as_conflict_count}")
         print(f"🌳 Replaced (Subtree Fixup): {self.subtree_fixup_count}")
         print(f"⏩ Skipped (Empty):          {self.skipped_empty_count}")
+        print(f"⏭️ Skipped (Complex):        {self.skipped_complex_conflict_count}")
         print("="*50)
 
 
@@ -188,6 +193,26 @@ def get_conflicted_files_with_status(repo):
     return conflicted_files
 
 
+def snapshot_conflict_state(repo, conflicts_dir, commit_id):
+    """Snapshots the current conflicted state of the repository."""
+    commit_record_dir = os.path.join(conflicts_dir, commit_id[:7])
+    conflict_dir = os.path.join(commit_record_dir, 'conflict')
+    os.makedirs(conflict_dir, exist_ok=True)
+
+    print(f'   Snapshotting conflicted state to: {conflict_dir}')
+    conflicted_files = list(get_conflicted_files_with_status(repo).keys())
+    for file_path in conflicted_files:
+        source_path = os.path.join(repo.working_dir, file_path)
+        if os.path.exists(source_path):
+            dst_path = os.path.join(conflict_dir, file_path)
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            if os.path.isdir(source_path):
+                shutil.copytree(source_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source_path, dst_path)
+    return conflicted_files
+
+
 def record_conflict(repo, conflicts_dir, logger, original_commit, yolo=False):
     resolution_method_used = None
     commit_id = original_commit['hexsha']
@@ -225,6 +250,7 @@ def record_conflict(repo, conflicts_dir, logger, original_commit, yolo=False):
 
     if os.path.exists(resolved_dir) and os.listdir(resolved_dir):
         print(f"   Found existing resolution in {resolved_dir}. Applying it directly.")
+        repo.git.rm('-r', '--force', *conflicted_files)
         for item in os.listdir(resolved_dir):
             src_path = os.path.join(resolved_dir, item)
             dest_path = os.path.join(repo.working_dir, item)
@@ -371,9 +397,9 @@ def main():
     rebase_parser.add_argument('--commits-file', type=str, default='commits.json')
     rebase_parser.add_argument('--conflicts-dir', type=str, default='conflicts')
     rebase_parser.add_argument('--last-successful-commit-ref', type=str, default=None)
-    rebase_parser.add_argument('--yolo', action='store_true', help='Automatically resolve all conflicts with "theirs" strategy. Use with caution.')
-    rebase_parser.add_argument('--test-commit', type=str, default=None, help='Test the rebase logic on a single commit.')
-    rebase_parser.add_argument('--commit-conflicts', action='store_true', help='Commit conflicts as-is with a special message for later resolution.')
+    rebase_parser.add_argument('--yolo', action='store_true')
+    rebase_parser.add_argument('--test-commit', type=str, default=None)
+    rebase_parser.add_argument('--commit-conflicts', action='store_true')
 
     import_parser = subparsers.add_parser('import-subtree', help='Import a dependency from DEPS as a squashed subtree.')
     import_parser.add_argument('--repo-path', type=str, required=True)
@@ -423,7 +449,7 @@ def main():
 
         last_successful_commit = None
         resume = args.last_successful_commit_ref is not None
-        for i, commit in enumerate(reversed(commits), 1):
+        for i, commit in enumerate(commits, 1):
             if resume:
                 if commit['hexsha'] == args.last_successful_commit_ref:
                     resume = False
@@ -434,70 +460,98 @@ def main():
                 print(f"❌ ERROR: Merge commit found in rebase plan: {commit['hexsha']}")
                 return
             
+            print(f"\n({i}/{len(commits)}) Applying: {commit.get('datetime', '')} - {commit['summary']}")
             try:
                 repo.git.cherry_pick(commit['hexsha'])
                 last_successful_commit = repo.head.commit.hexsha
-                print(f"✅ {i}/{len(commits)} cherry-picked successfully: {commit['hexsha']}")
+                print(f"✅ ({i}/{len(commits)}) cherry-picked successfully: {commit['hexsha']}")
                 logger.log_success()
             except git.exc.GitCommandError as e:
-                if args.commit_conflicts:
-                    print(f"⚠️  Committing conflict for {commit['hexsha']} as-is...")
-                    conflicted_files = list(get_conflicted_files_with_status(repo).keys())
-                    
-                    # Abort the cherry-pick so we can create our own commit.
+                if not get_conflicted_files_with_status(repo):
+                    print(f"INFO: Cherry-pick of {commit['hexsha']} resulted in an empty commit. Skipping.")
                     repo.git.cherry_pick('--abort')
-
-                    # Re-apply the conflicted state to the working directory
-                    try:
-                        repo.git.cherry_pick('--no-commit', commit['hexsha'])
-                    except git.exc.GitCommandError:
-                        # This is expected as it will result in a conflict.
-                        pass
-
-                    repo.git.add(all=True, force=True)
-                    
-                    original_commit_obj = repo.commit(commit['hexsha'])
-                    conflict_message = (
-                        f"[CONFLICT] Original Commit: {commit['hexsha']}\n\n"
-                        f"Original Message:\n{original_commit_obj.message}\n\n"
-                        f"Files with conflicts:\n" +
-                        "\n".join(f"- {f}" for f in conflicted_files)
-                    )
-                    
-                    repo.index.commit(
-                        conflict_message,
-                        author=original_commit_obj.author,
-                        committer=original_commit_obj.committer,
-                        author_date=original_commit_obj.authored_datetime.isoformat(),
-                        commit_date=original_commit_obj.committed_datetime.isoformat()
-                    )
-                    
-                    last_successful_commit = repo.head.commit.hexsha
-                    logger.log_committed_as_conflict()
-                    print(f"✅ Conflict for {commit['hexsha']} committed. Continuing rebase.\n")
+                    logger.log_skip()
+                    print(f"⏩ ({i}/{len(commits)}) was skipped.\n")
                     continue
 
-                handled = False
-                is_import_commit = "Import " in commit.get('message', commit['summary'])
-                is_directory_conflict = 'CONFLICT (file/directory)' in e.stdout
+                if args.commit_conflicts:
+                    is_import_commit = "Import " in commit.get('message', commit['summary'])
+                    is_directory_conflict = 'CONFLICT (file/directory)' in e.stdout
 
-                if is_import_commit and is_directory_conflict:
-                    print(f"⚠️  Detected import commit with directory conflict: {commit['hexsha']}. Attempting auto-fixup...")
-                    # (Auto-fixup logic here)
-                    logger.log_subtree_fixup()
-                    pass # Placeholder
+                    if is_import_commit and is_directory_conflict:
+                        print(f"⚠️ ({i}/{len(commits)}) Detected import commit with directory conflict: {commit['hexsha']}. Skipping and recording.")
+                        repo.git.cherry_pick('--abort')
+                        commit_record_dir = os.path.join(args.conflicts_dir, commit['hexsha'][:7])
+                        os.makedirs(commit_record_dir, exist_ok=True)
+                        info_path = os.path.join(commit_record_dir, 'skipped_import.txt')
+                        info_content = (f"Commit: {commit['hexsha']}\n"
+                                      f"Summary: {commit['summary']}\n"
+                                      f"Action: Skipped during --commit-conflicts run because it is a problematic subtree import.\n")
+                        with open(info_path, 'w', encoding='utf-8') as f:
+                            f.write(info_content)
+                        logger.log_subtree_fixup()
+                        print(f"   ✅ ({i}/{len(commits)}) Skipped and recorded.\n")
+                        continue
+                    else:
+                        conflicted_files_with_status = get_conflicted_files_with_status(repo)
+                        is_committable_conflict = not is_directory_conflict
 
-                if not handled:
-                    print(f"❌ Failed to cherry-pick or auto-fix: {commit['hexsha']}")
-                    try:
-                        was_successful, new_sha = record_conflict(repo, args.conflicts_dir, logger, commit, yolo=args.yolo)
-                        if was_successful:
-                            last_successful_commit = new_sha
-                            print(f"✅ {i}/{len(commits)} cherry-picked successfully after conflict: {commit['hexsha']}\n")
+                        if is_committable_conflict:
+                            print(f"⚠️ ({i}/{len(commits)}) Committing simple conflict for {commit['hexsha']} as-is...")
+                            commit_id = repo.git.rev_parse('CHERRY_PICK_HEAD')
+                            conflicted_files = snapshot_conflict_state(repo, args.conflicts_dir, commit_id)
+                            
+                            original_commit_obj = repo.commit(commit['hexsha'])
+                            conflict_message = (
+                                f"[CONFLICT] Original Commit: {commit['hexsha']}\n\n"
+                                f"Original Message:\n{original_commit_obj.message}\n\n"
+                                f"Files with conflicts:\n" +
+                                "\n".join(f"- {f}" for f in conflicted_files)
+                            )
+                            
+                            repo.git.add(all=True, force=True)
+                            
+                            author_date = original_commit_obj.authored_datetime.strftime("%Y-%m-%d %H:%M:%S %z")
+                            commit_date = original_commit_obj.committed_datetime.strftime("%Y-%m-%d %H:%M:%S %z")
+
+                            repo.index.commit(
+                                conflict_message,
+                                author=original_commit_obj.author,
+                                committer=original_commit_obj.committer,
+                                author_date=author_date,
+                                commit_date=commit_date
+                            )
+                            
+                            last_successful_commit = repo.head.commit.hexsha
+                            logger.log_committed_as_conflict()
+                            print(f"✅ ({i}/{len(commits)}) Conflict for {commit['hexsha']} committed. Continuing rebase.\n")
+                            continue
                         else:
-                            print(f"⏩ {i}/{len(commits)} was skipped.\n")
-                    except git.exc.GitCommandError:
-                        return
+                            print(f"⚠️ ({i}/{len(commits)}) Complex conflict for {commit['hexsha']} detected. Skipping and recording.")
+                            repo.git.cherry_pick('--abort')
+                            commit_record_dir = os.path.join(args.conflicts_dir, commit['hexsha'][:7])
+                            os.makedirs(commit_record_dir, exist_ok=True)
+                            info_path = os.path.join(commit_record_dir, 'skipped_complex_conflict.txt')
+                            info_content = (f"Commit: {commit['hexsha']}\n"
+                                          f"Summary: {commit['summary']}\n"
+                                          f"Action: Skipped during --commit-conflicts run because it caused a complex, uncommittable conflict.\n")
+                            with open(info_path, 'w', encoding='utf-8') as f:
+                                f.write(info_content)
+                            logger.log_skipped_complex_conflict()
+                            print(f"   ✅ ({i}/{len(commits)}) Skipped and recorded.\n")
+                            continue
+
+                # Fallback to standard resolution if not in --commit-conflicts mode
+                print(f"❌ ({i}/{len(commits)}) Failed to cherry-pick or auto-fix: {commit['hexsha']}")
+                try:
+                    was_successful, new_sha = record_conflict(repo, args.conflicts_dir, logger, commit, yolo=args.yolo)
+                    if was_successful:
+                        last_successful_commit = new_sha
+                        print(f"✅ ({i}/{len(commits)}) cherry-picked successfully after conflict: {commit['hexsha']}\n")
+                    else:
+                        print(f"⏩ ({i}/{len(commits)}) was skipped.\n")
+                except git.exc.GitCommandError:
+                    return
         
         logger.print_summary()
         print('\n🎉 SUCCESS: rebase created successfully!')
