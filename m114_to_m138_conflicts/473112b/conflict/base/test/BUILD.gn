@@ -73,8 +73,6 @@ static_library("test_support") {
     "gmock_move_support.h",
     "gtest_links.cc",
     "gtest_links.h",
-    "gtest_sub_test_results.cc",
-    "gtest_sub_test_results.h",
     "gtest_tags.cc",
     "gtest_tags.h",
     "gtest_util.cc",
@@ -85,8 +83,6 @@ static_library("test_support") {
     "gtest_xml_util.h",
     "icu_test_util.cc",
     "icu_test_util.h",
-    "insecure_random_generator.cc",
-    "insecure_random_generator.h",
     "launcher/test_result.cc",
     "launcher/test_result.h",
     "launcher/test_results_tracker.h",
@@ -210,12 +206,9 @@ static_library("test_support") {
     "//third_party/libxml:xml_reader",
   ]
 
-  # Cronet doesn't need the Perfetto test support stuff. This dependency is
-  # problematic for Cronet because of targets like
-  #   //third_party/perfetto/src/trace_processor/perfetto_sql/stdlib:stdlib_generated_file
-  # that would require special support in gn2bp (AOSP Cronet).
-  if (enable_base_tracing && !is_cronet_build) {
+  if (enable_base_tracing) {
     public_deps += [ "//third_party/perfetto:perfetto_test_support" ]
+<<<<<<< HEAD
     public_deps += [ ":test_trace_processor" ]
     sources += [
       "test_trace_processor.cc",
@@ -230,6 +223,18 @@ static_library("test_support") {
         ":test_trace_processor+bundle",
         ":test_trace_processor+link",
       ]
+=======
+    if (!is_chromeos && !is_cobalt_hermetic_build) {
+      # TODO(rasikan): Add to ios and chromeos when unblocked by the chromiumos
+      # change to add the shared lib to the chrome-binary-tests directory.
+      public_deps += [ ":test_trace_processor" ]
+      if (is_ios) {
+        deps += [
+          ":test_trace_processor+bundle",
+          ":test_trace_processor+link",
+        ]
+      }
+>>>>>>> 1181c533483 (Build base_unittests hermetically. (#4935))
     }
   }
 
@@ -272,6 +277,12 @@ static_library("test_support") {
     ]
   }
 
+  if (is_starboard) {
+    sources += [
+      "test_support_starboard.cc",
+      "test_support_starboard.h",
+    ]
+  }
   if (is_android) {
     sources += [
       "android/content_uri_test_utils.cc",
@@ -467,14 +478,20 @@ shared_library("immediate_crash_test_helper") {
   if (is_android) {
     configs -= [ "//build/config/android:hide_all_but_jni_onload" ]
   }
+
+  if (is_starboard) {
+    deps = [ "//starboard:starboard_group" ]
+  }
 }
 
+if (!is_starboard) {
 # This shared library is dynamically loaded by NativeLibrary unittests.
 shared_library("test_shared_library") {
   testonly = true
   sources = [ "test_shared_library.cc" ]
 
   deps = [ ":native_library_test_utils" ]
+}
 }
 
 if (is_ios) {
@@ -588,13 +605,16 @@ if (is_ios) {
   }
 }
 
+if (!is_starboard) {
 # Trivial executable which outputs space-delimited argv to stdout,
 # used for testing.
 executable("test_child_process") {
   testonly = true
   sources = [ "test_child_process.cc" ]
 }
+}
 
+<<<<<<< HEAD
 if (enable_base_tracing) {
   perfetto_cc_proto_descriptor("gen_cc_chrome_track_event_descriptor") {
     descriptor_name = "chrome_track_event.descriptor"
@@ -618,6 +638,9 @@ if (enable_base_tracing) {
            ] + rebase_path(sources, root_build_dir)
   }
 
+=======
+if (enable_base_tracing && !is_cobalt_hermetic_build) {
+>>>>>>> 1181c533483 (Build base_unittests hermetically. (#4935))
   # We encapsulate the trace processor in a separate shared library to prevent
   # any duplicate symbol issues. Perfetto symbols are exported by chromium’s
   # base via a public_dep on libperfetto; libtrace_processor also depends on
@@ -709,7 +732,6 @@ if (is_android) {
 
     sources = [
       "android/javatests/src/org/chromium/base/test/transit/ActivityElement.java",
-      "android/javatests/src/org/chromium/base/test/transit/BaseElements.java",
       "android/javatests/src/org/chromium/base/test/transit/BatchedPublicTransitRule.java",
       "android/javatests/src/org/chromium/base/test/transit/CallbackCondition.java",
       "android/javatests/src/org/chromium/base/test/transit/CarryOn.java",
@@ -735,7 +757,6 @@ if (is_android) {
       "android/javatests/src/org/chromium/base/test/transit/MoreViewConditions.java",
       "android/javatests/src/org/chromium/base/test/transit/PublicTransitConfig.java",
       "android/javatests/src/org/chromium/base/test/transit/ScrollableFacility.java",
-      "android/javatests/src/org/chromium/base/test/transit/SimpleConditions.java",
       "android/javatests/src/org/chromium/base/test/transit/Station.java",
       "android/javatests/src/org/chromium/base/test/transit/StatusStore.java",
       "android/javatests/src/org/chromium/base/test/transit/TrafficControl.java",
@@ -757,7 +778,6 @@ if (is_android) {
       "//base:base_java_test_support",
       "//base:base_junit_test_support",
       "//base:callback_java",
-      "//base:log_java",
       "//third_party/junit",
     ]
 

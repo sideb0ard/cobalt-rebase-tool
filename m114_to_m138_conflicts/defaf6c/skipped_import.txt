@@ -1,0 +1,3 @@
+Commit: defaf6c156b6ede3f23a64cbf9540507eef56ec0
+Summary: Import QUICHE from commit 02c69dd2
+Action: Skipped during --commit-conflicts run because it is a problematic subtree import.

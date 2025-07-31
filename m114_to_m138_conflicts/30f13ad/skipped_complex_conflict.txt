@@ -1,0 +1,3 @@
+Commit: 30f13ad92295011740869fb1b5cd2bba6a3ee3b8
+Summary: Build raspi-2 hermetically. (#6216)
+Action: Skipped during --commit-conflicts run because it caused a complex, uncommittable conflict.

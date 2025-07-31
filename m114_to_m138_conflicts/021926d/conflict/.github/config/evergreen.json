@@ -1,0 +1,50 @@
+{
+  "docker_service": "linux",
+  "platforms": [
+    "evergreen-x64"
+  ],
+<<<<<<< HEAD:.github/config/linux-evergreen.json
+<<<<<<< HEAD
+=======
+  "test_on_host": true,
+=======
+  "test_on_host": false,
+>>>>>>> 021926dc7d9 (Add evergreen platform (#5822)):.github/config/evergreen.json
+  "test_root_target": "//cobalt:gn_all",
+  "num_gtest_shards": 1,
+>>>>>>> c35a7661e27 (Enable base_unittests on the CI. (#5159))
+  "targets": [
+    "base",
+    "base_unittests",
+<<<<<<< HEAD
+    "nplb"
+=======
+    "boringssl_ssl_tests",
+    "cobalt",
+    "crypto_unittests",
+    "elf_loader_sandbox",
+    "elf_loader_sys_sandbox",
+    "ipc_tests",
+    "loader_app",
+    "net",
+    "net_unittests",
+    "nplb",
+    "skia",
+    "sql_unittests",
+    "trace_processor_minimal_smoke_tests",
+    "url_unittests",
+<<<<<<< HEAD
+    "zlib_unittests",
+    "cobalt"
+>>>>>>> a2d91bbcf6d (Build libcobalt.so hermetically (#5048))
+=======
+    "zlib_unittests"
+>>>>>>> 557d5b61857 (Fix target names being built according to alphabetical order (#5580))
+  ],
+  "includes": [
+    {
+      "name": "x64",
+      "platform": "evergreen-x64"
+    }
+  ]
+}

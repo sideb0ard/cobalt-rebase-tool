@@ -63,10 +63,8 @@ inline void DetachFromVM() {
 // Initializes the global JVM.
 BASE_EXPORT void InitVM(JavaVM* vm);
 
-// Returns true if the global JVM has been initialized. This happens
-// immediately on native library load, so this is still correct even very
-// early in startup.
-inline bool IsJavaAvailable() {
+// Returns true if the global JVM has been initialized.
+inline bool IsVMInitialized() {
   return jni_zero::IsVMInitialized();
 }
 
@@ -118,15 +116,8 @@ BASE_EXPORT std::string GetJavaStackTraceIfPresent();
 BASE_EXPORT std::string GetJavaExceptionInfo(JNIEnv* env,
                                              jthrowable java_throwable);
 
-<<<<<<< HEAD
-#if BUILDFLAG(IS_COBALT)
 // Utility method to find the java file name from the java stack trace.
 BASE_EXPORT std::string FindFirstJavaFileAndLine(const std::string& stackTrace);
-#endif
-=======
-// Utility method to find the java file name from the java stack trace.
-BASE_EXPORT std::string FindFirstJavaFileAndLine(const std::string& stackTrace);
->>>>>>> 502a632502b (Informative JNI crash message (#6337))
 
 #if BUILDFLAG(CAN_UNWIND_WITH_FRAME_POINTERS)
 
@@ -147,7 +138,7 @@ class BASE_EXPORT JNIStackFrameSaver {
 };
 
 #endif  // BUILDFLAG(CAN_UNWIND_WITH_FRAME_POINTERS)
->>>>>>> 649a0a7bbb9 (Add IS_COBALT macro for jni_android files (#6363))
+>>>>>>> 502a632502b (Informative JNI crash message (#6337))
 
 using MethodID = jni_zero::MethodID;
 }  // namespace android

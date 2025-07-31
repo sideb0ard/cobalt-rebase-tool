@@ -1,0 +1,3 @@
+Commit: aa039eb24b879ee1177ee42409b3ecbaf8f18822
+Summary: Remove sysroot from linux hermetic builds (#5734)
+Action: Skipped during --commit-conflicts run because it caused a complex, uncommittable conflict.

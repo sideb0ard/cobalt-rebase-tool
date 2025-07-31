@@ -1,0 +1,3 @@
+Commit: 04a8f78c7630579c6765bdc2f6b00db2567abb08
+Summary: Fix the gtest output for hermetic builds (#5873)
+Action: Skipped during --commit-conflicts run because it caused a complex, uncommittable conflict.

@@ -1,0 +1,3 @@
+Commit: 8181261860c7e2d542f8dfe441c92c2bc874d071
+Summary: Fix remaining compiler issues in hermetic cobalt (#5316)
+Action: Skipped during --commit-conflicts run because it caused a complex, uncommittable conflict.
