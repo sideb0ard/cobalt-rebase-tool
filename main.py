@@ -8,6 +8,32 @@ import subprocess
 import re
 import tempfile
 
+import common
+import convert_dep_to_squashed
+
+COBALT_IMPORTED_MODULES = [
+    'net/third_party/quiche/src',
+]
+
+def do_import_subtree(repo, deps_file, module, git_source, git_rev):
+    start, end = common.get_field_def_pos(deps_file, 'src/' + module)
+    print('Commenting out the DEPS files for module %s' % module)
+    with open(deps_file, 'r+', encoding='utf-8') as f:
+        lines = f.readlines()
+        for i in range(start, end):
+            lines[i] = '#' + lines[i]
+        lines.insert(start, '# Cobalt: imported\n')
+        f.seek(0)
+        f.writelines(lines)
+    module_dir = os.path.join(repo.working_dir, module)
+    repo.index.remove([module_dir], working_tree=True)
+    repo.index.add([deps_file])
+    repo.index.commit('Roll up for module %s to rev %s.' %
+                        (module, git_rev))
+    repo.git.reset('--hard')
+    print('Attempting to add the subtree %s.' % module)
+    repo.git.subtree('add', '--squash', '--prefix', module,
+                        git_source, git_rev)
 
 def find_deepest_common_dir(paths):
     if not paths:
@@ -328,55 +354,137 @@ def record_conflict(repo, conflicts_dir, logger, original_commit, yolo=False):
     return True, new_commit_sha
 
 
-def perform_subtree_import(repo, dependency_path, dep_url, dep_commit):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        print(f"   Cloning {dep_url} into temporary directory...")
-        dep_repo = git.Repo.clone_from(dep_url, temp_dir)
-        print(f"   Checking out specific commit: {dep_commit}")
-        dep_repo.git.checkout(dep_commit)
-        shutil.rmtree(os.path.join(temp_dir, '.git'))
-        dest_path = os.path.join(repo.working_dir, dependency_path)
-        print(f"   Copying files to {dest_path}")
-        if os.path.exists(dest_path):
-            shutil.rmtree(dest_path)
-        shutil.copytree(temp_dir, dest_path)
-        repo.git.add(dependency_path, force=True)
-
-
+# def perform_subtree_import(repo, dependency_path, dep_url, dep_commit):
+#     with tempfile.TemporaryDirectory() as temp_dir:
+#         print(f"   Cloning {dep_url} into temporary directory...")
+#         dep_repo = git.Repo.clone_from(dep_url, temp_dir)
+#         print(f"   Checking out specific commit: {dep_commit}")
+#         dep_repo.git.checkout(dep_commit)
+#         shutil.rmtree(os.path.join(temp_dir, '.git'))
+#         dest_path = os.path.join(repo.working_dir, dependency_path)
+#         print(f"   Copying files to {dest_path}")
+#         if os.path.exists(dest_path):
+#             shutil.rmtree(dest_path)
+#         shutil.copytree(temp_dir, dest_path)
+#         repo.git.add(dependency_path, force=True)
+# 
+# 
 def import_subtree(repo, args):
-    print(f"Attempting to import '{args.dependency_path}' as a subtree on branch '{args.branch}'...")
+    print(f"Attempting to import DEPS modules on branch '{args.branch}'...")
+    modules_to_update = {}
     repo.git.checkout(args.branch)
-    deps_path = os.path.join(repo.working_dir, 'DEPS')
-    if not os.path.exists(deps_path):
-        print(f"❌ Error: DEPS file not found at {deps_path}")
-        return
-
-    dep_url, dep_commit = None, None
-    dependency_path_pattern = re.compile(rf"['\"]{re.escape(args.dependency_path)}['\"]")
-    with open(deps_path, 'r', encoding='utf-8') as f:
-        deps_content = f.read()
-    for line in deps_content.splitlines():
-        if dependency_path_pattern.search(line):
-            match = re.search(r"['\"]([^']+)@([^']+)['\"]", line)
-            if match:
-                dep_url, dep_commit = match.groups()
-                break
-    if not dep_url or not dep_commit:
-        print(f"❌ Error: Could not find dependency info for '{args.dependency_path}' in DEPS.")
-        return
-
-    perform_subtree_import(repo, args.dependency_path, dep_url, dep_commit)
-    
-    print("   Updating DEPS file...")
-    new_deps_lines = [line for line in deps_content.splitlines() if not dependency_path_pattern.search(line)]
-    with open(deps_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(new_deps_lines))
-    repo.git.add(deps_path)
-    
-    commit_message = (f"Import {args.dependency_path} as a subtree\n\n"
-                    f"Removes {args.dependency_path} from DEPS and imports from {dep_commit}.")
-    repo.index.commit(commit_message)
-    print(f"\n🎉 SUCCESS: Imported '{args.dependency_path}' as a subtree.")
+    deps_file = os.path.join(repo.working_dir, "DEPS")
+    for module in COBALT_IMPORTED_MODULES:
+        try:
+            modules_to_update[
+                module] = convert_dep_to_squashed.parse_depfile(
+                    deps_file, module)
+        except ValueError:
+            print(
+                'Missing module %s in %s. Assuming module no longer used.'
+                % (module, deps_file))
+            continue
+        except RuntimeError as e:
+            print('Error while locating modules %s in %s: %s' %
+                  (module, deps_file, e))
+            continue
+    for module in modules_to_update.keys():
+        git_source, git_rev = modules_to_update[module]
+        do_import_subtree(repo, deps_file, module, git_source, git_rev)
+#     
+#     # Step 1: Use gclient to reliably get the commit hash.
+#     gclient_command = ['gclient', 'getdep', '-r', args.dependency_path]
+#     dep_commit = None
+#     try:
+#         print(f"   Running gclient to get dependency commit: {' '.join(gclient_command)}")
+#         process = subprocess.run(
+#             gclient_command,
+#             capture_output=True, text=True, check=True,
+#             cwd=repo.working_dir
+#         )
+#         dep_commit = process.stdout.strip()
+#         if not re.fullmatch(r'[a-fA-F0-9]{40}', dep_commit):
+#              print(f"❌ Error: gclient did not return a valid commit hash.")
+#              print(f"   gclient output: {dep_commit}")
+#              return
+#         print(f"   Found dependency commit: {dep_commit}")
+# 
+#     except (subprocess.CalledProcessError, FileNotFoundError) as e:
+#         print(f"❌ Error: gclient command failed. Make sure gclient is in your PATH.")
+#         if hasattr(e, 'stderr'):
+#             print(f"   gclient stderr: {e.stderr}")
+#         return
+# 
+#     # Step 2: Parse the DEPS file to get the URL.
+#     deps_path = os.path.join(repo.working_dir, 'DEPS')
+#     dep_url = None
+#     # Step 2: Parse the DEPS file to get the URL.
+#     deps_content = ''
+#     with open(deps_path, 'r', encoding='utf-8') as f:
+#         deps_content = f.read()
+# 
+#     # A simple parser for the 'vars' section
+#     vars_match = re.search(r"vars\s*=\s*\{([^}]+)\}", deps_content, re.DOTALL)
+#     variables = {}
+#     if vars_match:
+#         vars_content = vars_match.group(1)
+#         # This regex is designed to handle the specific format of the DEPS file,
+#         # including multiline variable definitions.
+#         var_pattern = re.compile(r"['\"]([^'\"]+)['\"]\s*:\s*([^,]+),", re.DOTALL)
+#         for match in var_pattern.finditer(vars_content):
+#             key = match.group(1)
+#             value = match.group(2).strip().strip("['\"]")
+#             variables[key] = value
+# 
+#     dep_url = None
+#     
+#     # Find the dependency line and extract the URL expression
+#     dependency_line_pattern = re.compile(rf"['\"]{re.escape(args.dependency_path)}['\"]\s*:\s*(.+),", re.DOTALL)
+#     match = dependency_line_pattern.search(deps_content)
+#     
+#     if match:
+#         url_expression = match.group(1).strip()
+#         
+#         # Replace Var('...') placeholders
+#         def replace_var(m):
+#             var_name = m.group(1)
+#             return variables.get(var_name, f"Var('{var_name}')")
+# 
+#         # Handle Var(...) syntax
+#         resolved_expression = re.sub(r"Var\(['\"]([^'\"]+)['\"]\)", replace_var, url_expression)
+#         
+#         # Clean up and combine parts, removing quotes and splitting by '+'
+#         url_parts = [part.strip().strip("['\"]") for part in resolved_expression.split('+')]
+#         
+#         # The actual URL is the first part of the expression before the '@'
+#         base_url_parts = []
+#         for part in url_parts:
+#             if '@' in part:
+#                 base_url_parts.append(part.split('@')[0])
+#                 break
+#             else:
+#                 base_url_parts.append(part)
+#         
+#         dep_url = ''.join(base_url_parts)
+# 
+#         # Final check if the URL is fully resolved
+#         if 'Var(' in dep_url:
+#             print(f"❌ Error: Could not fully resolve URL variables in: {dep_url}")
+#             dep_url = None
+#     
+#     if not dep_url:
+#         print(f"❌ Error: Could not parse dependency URL for '{args.dependency_path}' from DEPS file.")
+#         return
+#     
+#     print(f"   Found dependency URL: {dep_url}")
+# 
+#     # Step 3: Perform the import and commit.
+#     perform_subtree_import(repo, args.dependency_path, dep_url, dep_commit)
+#     
+#     commit_message = (f"Import {args.dependency_path} as a subtree\n\n"
+#                     f"Imports files from {dep_commit} using gclient.")
+#     repo.index.commit(commit_message)
+#     print(f"\n🎉 SUCCESS: Imported '{args.dependency_path}' as a subtree.")
 
 
 def main():
@@ -403,7 +511,6 @@ def main():
 
     import_parser = subparsers.add_parser('import-subtree', help='Import a dependency from DEPS as a squashed subtree.')
     import_parser.add_argument('--repo-path', type=str, required=True)
-    import_parser.add_argument('--dependency-path', type=str, required=True)
     import_parser.add_argument('--branch', type=str, default='main')
 
     args = parser.parse_args()
